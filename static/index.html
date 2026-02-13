@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Neo4j Graph Manager</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300 ;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -620,6 +620,7 @@
         }
     </style>
 <base target="_blank">
+<base target="_blank">
 </head>
 <body>
     <div class="bg-animation"></div>
@@ -671,12 +672,12 @@
                 <form id="insertForm">
                     <div class="form-group">
                         <label class="form-label">From Node</label>
-                        <input type="text" class="form-input" id="fromNode" placeholder="e.g., Node A" required>
+                        <input type="text" class="form-input" id="fromNode" placeholder="e.g., NODEA123" required>
                     </div>
 
                     <div class="form-group">
                         <label class="form-label">To Node</label>
-                        <input type="text" class="form-input" id="toNode" placeholder="e.g., Node B" required>
+                        <input type="text" class="form-input" id="toNode" placeholder="e.g., NODEB456" required>
                     </div>
 
                     <div class="form-row">
@@ -754,7 +755,45 @@
         document.addEventListener('DOMContentLoaded', () => {
             checkHealth();
             setupVisualUpdates();
+            setupInputSanitization();
         });
+
+        // Sanitize node name: remove special chars, spaces, convert to uppercase
+        function sanitizeNodeName(value) {
+            return value
+                .toUpperCase()                    // Convert to uppercase
+                .replace(/[^A-Z0-9]/g, '');      // Remove everything except A-Z and 0-9
+        }
+
+        // Setup input sanitization for node fields
+        function setupInputSanitization() {
+            const fromNode = document.getElementById('fromNode');
+            const toNode = document.getElementById('toNode');
+
+            // Real-time sanitization on input
+            fromNode.addEventListener('input', (e) => {
+                const sanitized = sanitizeNodeName(e.target.value);
+                if (e.target.value !== sanitized) {
+                    e.target.value = sanitized;
+                }
+            });
+
+            toNode.addEventListener('input', (e) => {
+                const sanitized = sanitizeNodeName(e.target.value);
+                if (e.target.value !== sanitized) {
+                    e.target.value = sanitized;
+                }
+            });
+
+            // Sanitize on blur (when user leaves the field)
+            fromNode.addEventListener('blur', (e) => {
+                e.target.value = sanitizeNodeName(e.target.value);
+            });
+
+            toNode.addEventListener('blur', (e) => {
+                e.target.value = sanitizeNodeName(e.target.value);
+            });
+        }
 
         // Setup visual updates for node names
         function setupVisualUpdates() {
@@ -828,13 +867,23 @@
             const submitBtn = document.getElementById('submitBtn');
             const originalContent = submitBtn.innerHTML;
 
+            // Sanitize inputs before sending
+            const fromNodeValue = sanitizeNodeName(document.getElementById('fromNode').value);
+            const toNodeValue = sanitizeNodeName(document.getElementById('toNode').value);
+
+            // Validate that we have values after sanitization
+            if (!fromNodeValue || !toNodeValue) {
+                showToast('error', '❌ Node names must contain at least one letter or number');
+                return;
+            }
+
             // Loading state
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<div class="btn-spinner"></div> Creating...';
 
             const data = {
-                from_node: document.getElementById('fromNode').value.trim(),
-                to_node: document.getElementById('toNode').value.trim(),
+                from_node: fromNodeValue,
+                to_node: toNodeValue,
                 distance: parseFloat(document.getElementById('distance').value),
                 angle: parseFloat(document.getElementById('angle').value)
             };
