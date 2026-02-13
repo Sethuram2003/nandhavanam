@@ -904,10 +904,8 @@
                     document.getElementById('insertForm').reset();
                     updateVisual();
                 } else {
-                    showToast('error', '❌ ' + (result.message || 'Failed to create relationship'));
+                    showToast('error', '❌ ' + (result.message || 'Failed to create connection'));
                 }
-            } catch (error) {
-                showToast('error', '❌ Network error. Please check your connection.');
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalContent;
