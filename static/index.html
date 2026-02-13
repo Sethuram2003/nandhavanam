@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neo4j Graph Manager</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --primary-light: #818cf8;
+            --danger: #ef4444;
+            --danger-dark: #dc2626;
+            --success: #10b981;
+            --success-dark: #059669;
+            --warning: #f59e0b;
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --bg-input: #334155;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border: #475569;
+            --shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            --shadow-glow: 0 0 40px rgba(99, 102, 241, 0.3);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-dark);
+            min-height: 100vh;
+            color: var(--text-primary);
+            overflow-x: hidden;
+        }
+
+        /* Animated Background */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .bg-animation::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 20% 80%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
+                        radial-gradient(circle at 40% 40%, rgba(236, 72, 153, 0.1) 0%, transparent 40%);
+            animation: float 20s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            33% { transform: translate(30px, -30px) rotate(120deg); }
+            66% { transform: translate(-20px, 20px) rotate(240deg); }
+        }
+
+        /* Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        .header h1 {
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 50%, #ec4899 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        /* Status Card */
+        .status-card {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 1.5rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border);
+            backdrop-filter: blur(10px);
+            animation: fadeInUp 0.8s ease-out 0.2s both;
+            transition: all 0.3s ease;
+        }
+
+        .status-card:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .status-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .status-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .status-icon.online {
+            background: linear-gradient(135deg, var(--success), var(--success-dark));
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+        }
+
+        .status-icon.offline {
+            background: linear-gradient(135deg, var(--danger), var(--danger-dark));
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+        }
+
+        .status-icon.checking {
+            background: linear-gradient(135deg, var(--warning), #d97706);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .status-text h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .status-text p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .refresh-btn {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .refresh-btn:hover {
+            background: var(--primary);
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        /* Grid Layout */
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+
+        @media (min-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border-radius: 24px;
+            padding: 2rem;
+            border: 1px solid var(--border);
+            backdrop-filter: blur(10px);
+            animation: fadeInUp 0.8s ease-out 0.4s both;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .card-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.75rem;
+        }
+
+        .card-icon.primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            box-shadow: 0 10px 30px rgba(99, 102, 241, 0.3);
+        }
+
+        .card-icon.danger {
+            background: linear-gradient(135deg, var(--danger), var(--danger-dark));
+            box-shadow: 0 10px 30px rgba(239, 68, 68, 0.3);
+        }
+
+        .card-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+
+        .card-subtitle {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-top: 0.25rem;
+        }
+
+        /* Form Styles */
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            font-size: 0.95rem;
+            color: var(--text-primary);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 1rem 1.25rem;
+            background: var(--bg-input);
+            border: 2px solid var(--border);
+            border-radius: 14px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            font-family: inherit;
+            transition: all 0.3s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
+        }
+
+        .form-input::placeholder {
+            color: var(--text-secondary);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        @media (max-width: 480px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Buttons */
+        .btn {
+            width: 100%;
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 14px;
+            font-size: 1rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            box-shadow: 0 10px 30px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-primary:active {
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--danger), var(--danger-dark));
+            color: white;
+            box-shadow: 0 10px 30px rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(239, 68, 68, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .btn-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid transparent;
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Alert/Toast */
+        .toast-container {
+            position: fixed;
+            top: 2rem;
+            right: 2rem;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .toast {
+            padding: 1rem 1.5rem;
+            border-radius: 14px;
+            color: white;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            animation: slideIn 0.4s ease-out;
+            backdrop-filter: blur(10px);
+            min-width: 300px;
+            box-shadow: var(--shadow);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .toast.success {
+            background: linear-gradient(135deg, var(--success), var(--success-dark));
+        }
+
+        .toast.error {
+            background: linear-gradient(135deg, var(--danger), var(--danger-dark));
+        }
+
+        .toast.warning {
+            background: linear-gradient(135deg, var(--warning), #d97706);
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1001;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: var(--bg-card);
+            border-radius: 24px;
+            padding: 2rem;
+            max-width: 400px;
+            width: 90%;
+            border: 1px solid var(--border);
+            transform: scale(0.9);
+            transition: all 0.3s ease;
+        }
+
+        .modal-overlay.active .modal {
+            transform: scale(1);
+        }
+
+        .modal-icon {
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, var(--danger), var(--danger-dark));
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            margin: 0 auto 1.5rem;
+            box-shadow: 0 10px 30px rgba(239, 68, 68, 0.3);
+        }
+
+        .modal h3 {
+            text-align: center;
+            font-size: 1.4rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .modal p {
+            text-align: center;
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .modal-actions .btn {
+            flex: 1;
+        }
+
+        .btn-secondary {
+            background: var(--bg-input);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border);
+        }
+
+        /* Animations */
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Connection Lines Visual */
+        .connection-visual {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-input);
+            border-radius: 16px;
+            border: 2px dashed var(--border);
+        }
+
+        .node-circle {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.7rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .connection-line {
+            flex: 1;
+            max-width: 100px;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary), var(--primary-light));
+            border-radius: 2px;
+            position: relative;
+        }
+
+        .connection-line::after {
+            content: '';
+            position: absolute;
+            right: -8px;
+            top: 50%;
+            transform: translateY(-50%);
+            border: 6px solid transparent;
+            border-left-color: var(--primary-light);
+        }
+
+        .connection-label {
+            position: absolute;
+            top: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            margin-top: 3rem;
+            padding: 2rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            animation: fadeInUp 0.8s ease-out 0.6s both;
+        }
+
+        .footer a {
+            color: var(--primary-light);
+            text-decoration: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .status-card {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+
+            .status-info {
+                flex-direction: column;
+            }
+
+            .card {
+                padding: 1.5rem;
+            }
+
+            .toast-container {
+                left: 1rem;
+                right: 1rem;
+                top: 1rem;
+            }
+
+            .toast {
+                min-width: auto;
+            }
+        }
+    </style>
+<base target="_blank">
+</head>
+<body>
+    <div class="bg-animation"></div>
+
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>Neo4j Graph Manager</h1>
+            <p>Manage your graph database with ease</p>
+        </header>
+
+        <!-- Status Card -->
+        <div class="status-card">
+            <div class="status-info">
+                <div class="status-icon checking" id="statusIcon">
+                    ⏳
+                </div>
+                <div class="status-text">
+                    <h3 id="statusTitle">Checking Service</h3>
+                    <p id="statusDesc">Verifying API connection...</p>
+                </div>
+            </div>
+            <button class="refresh-btn" onclick="checkHealth()">
+                <span>🔄</span> Refresh
+            </button>
+        </div>
+
+        <!-- Grid -->
+        <div class="grid">
+            <!-- Insert Data Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon primary">🔗</div>
+                    <div>
+                        <h2 class="card-title">Create Relationship</h2>
+                        <p class="card-subtitle">Add new node connections</p>
+                    </div>
+                </div>
+
+                <!-- Visual Representation -->
+                <div class="connection-visual">
+                    <div class="node-circle" id="fromNodeVisual">From</div>
+                    <div class="connection-line">
+                        <span class="connection-label" id="connectionLabel">distance & angle</span>
+                    </div>
+                    <div class="node-circle" id="toNodeVisual">To</div>
+                </div>
+
+                <form id="insertForm">
+                    <div class="form-group">
+                        <label class="form-label">From Node</label>
+                        <input type="text" class="form-input" id="fromNode" placeholder="e.g., Node A" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">To Node</label>
+                        <input type="text" class="form-input" id="toNode" placeholder="e.g., Node B" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Distance</label>
+                            <input type="number" class="form-input" id="distance" placeholder="0.0" step="0.01" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Angle (degrees)</label>
+                            <input type="number" class="form-input" id="angle" placeholder="0.0" step="0.01" required>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="submitBtn">
+                        <span>✨</span> Create Relationship
+                    </button>
+                </form>
+            </div>
+
+            <!-- Clear Database Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon danger">🗑️</div>
+                    <div>
+                        <h2 class="card-title">Clear Database</h2>
+                        <p class="card-subtitle">Remove all data permanently</p>
+                    </div>
+                </div>
+
+                <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 16px; padding: 1.5rem; margin-bottom: 1.5rem;">
+                    <h4 style="color: var(--danger); margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <span>⚠️</span> Warning
+                    </h4>
+                    <p style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6;">
+                        This action will permanently delete all nodes and relationships from your Neo4j database. This cannot be undone.
+                    </p>
+                </div>
+
+                <button class="btn btn-danger" id="clearBtn" onclick="showClearModal()">
+                    <span>🗑️</span> Clear Database
+                </button>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Neo4j Graph Manager • FastAPI Powered</p>
+        </footer>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Clear Confirmation Modal -->
+    <div class="modal-overlay" id="clearModal">
+        <div class="modal">
+            <div class="modal-icon">⚠️</div>
+            <h3>Are you sure?</h3>
+            <p>This will permanently delete all data from your Neo4j database. This action cannot be undone.</p>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="hideClearModal()">Cancel</button>
+                <button class="btn btn-danger" id="confirmClearBtn" onclick="clearDatabase()">
+                    <span>🗑️</span> Yes, Clear All
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API Base URL - Change this if your API is hosted elsewhere
+        const API_BASE_URL = window.location.origin;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            checkHealth();
+            setupVisualUpdates();
+        });
+
+        // Setup visual updates for node names
+        function setupVisualUpdates() {
+            const fromNode = document.getElementById('fromNode');
+            const toNode = document.getElementById('toNode');
+            const distance = document.getElementById('distance');
+            const angle = document.getElementById('angle');
+            const fromVisual = document.getElementById('fromNodeVisual');
+            const toVisual = document.getElementById('toNodeVisual');
+            const label = document.getElementById('connectionLabel');
+
+            function updateVisual() {
+                fromVisual.textContent = fromNode.value || 'From';
+                toVisual.textContent = toNode.value || 'To';
+                
+                const dist = parseFloat(distance.value);
+                const ang = parseFloat(angle.value);
+                
+                if (!isNaN(dist) && !isNaN(ang)) {
+                    label.textContent = `d: ${dist}, θ: ${ang}°`;
+                } else if (!isNaN(dist)) {
+                    label.textContent = `distance: ${dist}`;
+                } else if (!isNaN(ang)) {
+                    label.textContent = `angle: ${ang}°`;
+                } else {
+                    label.textContent = 'distance & angle';
+                }
+            }
+
+            fromNode.addEventListener('input', updateVisual);
+            toNode.addEventListener('input', updateVisual);
+            distance.addEventListener('input', updateVisual);
+            angle.addEventListener('input', updateVisual);
+        }
+
+        // Health Check
+        async function checkHealth() {
+            const icon = document.getElementById('statusIcon');
+            const title = document.getElementById('statusTitle');
+            const desc = document.getElementById('statusDesc');
+
+            icon.className = 'status-icon checking';
+            icon.textContent = '⏳';
+            title.textContent = 'Checking Service';
+            desc.textContent = 'Verifying API connection...';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/health`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    icon.className = 'status-icon online';
+                    icon.textContent = '✅';
+                    title.textContent = 'Service Online';
+                    desc.textContent = 'API is running and ready';
+                } else {
+                    throw new Error('Service unavailable');
+                }
+            } catch (error) {
+                icon.className = 'status-icon offline';
+                icon.textContent = '❌';
+                title.textContent = 'Service Offline';
+                desc.textContent = 'Cannot connect to API';
+            }
+        }
+
+        // Insert Form Submit
+        document.getElementById('insertForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('submitBtn');
+            const originalContent = submitBtn.innerHTML;
+
+            // Loading state
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<div class="btn-spinner"></div> Creating...';
+
+            const data = {
+                from_node: document.getElementById('fromNode').value.trim(),
+                to_node: document.getElementById('toNode').value.trim(),
+                distance: parseFloat(document.getElementById('distance').value),
+                angle: parseFloat(document.getElementById('angle').value)
+            };
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/neo4j-insert-data`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showToast('success', '✅ ' + result.message);
+                    document.getElementById('insertForm').reset();
+                    updateVisual();
+                } else {
+                    showToast('error', '❌ ' + (result.message || 'Failed to create relationship'));
+                }
+            } catch (error) {
+                showToast('error', '❌ Network error. Please check your connection.');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalContent;
+            }
+        });
+
+        // Show Clear Modal
+        function showClearModal() {
+            document.getElementById('clearModal').classList.add('active');
+        }
+
+        // Hide Clear Modal
+        function hideClearModal() {
+            document.getElementById('clearModal').classList.remove('active');
+        }
+
+        // Clear Database
+        async function clearDatabase() {
+            const confirmBtn = document.getElementById('confirmClearBtn');
+            const originalContent = confirmBtn.innerHTML;
+
+            confirmBtn.disabled = true;
+            confirmBtn.innerHTML = '<div class="btn-spinner"></div> Clearing...';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/neo4j-clear-database`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showToast('success', '✅ ' + result.message);
+                    hideClearModal();
+                } else {
+                    showToast('error', '❌ ' + (result.message || 'Failed to clear database'));
+                }
+            } catch (error) {
+                showToast('error', '❌ Network error. Please check your connection.');
+            } finally {
+                confirmBtn.disabled = false;
+                confirmBtn.innerHTML = originalContent;
+            }
+        }
+
+        // Show Toast Notification
+        function showToast(type, message) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+
+            container.appendChild(toast);
+
+            // Remove after 4 seconds
+            setTimeout(() => {
+                toast.style.animation = 'slideIn 0.4s ease-out reverse';
+                setTimeout(() => toast.remove(), 400);
+            }, 4000);
+        }
+
+        // Close modal on overlay click
+        document.getElementById('clearModal').addEventListener('click', (e) => {
+            if (e.target.id === 'clearModal') {
+                hideClearModal();
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                hideClearModal();
+            }
+        });
+    </script>
+</body>
+</html>

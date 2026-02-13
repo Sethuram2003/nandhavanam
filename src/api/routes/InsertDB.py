@@ -2,8 +2,6 @@ from fastapi.responses import JSONResponse
 from fastapi import FastAPI, APIRouter
 from src.core.neo4j_database.neo4j_service import get_neo4j_service
 from src.core.neo4j_database.schema import NodeRelationship
-from dotenv import load_dotenv
-load_dotenv()
 
 insert_db_router = APIRouter(tags=["Graph"])
 
@@ -26,8 +24,6 @@ async def insert_database_neo4j(input_data: NodeRelationship):
     else:
         print("Creating relationship...")
         manager.create_relationship(relationship)
-
-    
 
     return JSONResponse(content={"message": f"Relationship created between {relationship.from_node} and {relationship.to_node} with distance {relationship.distance} and angle {relationship.angle}."})
 
