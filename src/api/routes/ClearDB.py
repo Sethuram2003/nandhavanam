@@ -16,9 +16,7 @@ async def clear_database_neo4j():
     """
     manager = get_neo4j_service()
 
-    manager.clear_database(
-        db_name=os.getenv("NEO4J_DATABASE")
-    )
+    manager.clear_database()
 
     return JSONResponse(content={"message": f"{os.getenv('NEO4J_DATABASE')} Database has been cleared."})
 

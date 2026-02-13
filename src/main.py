@@ -1,14 +1,16 @@
 from dotenv import load_dotenv
 load_dotenv()
+import os
 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from src.api.routes.HealthCheck import health_check_router
 from src.api.routes.ClearDB import clear_db_router
-
-
+from src.api.routes.InsertDB import insert_db_router
 from src.core.neo4j_database.neo4j_service import get_neo4j_service, close_neo4j_service
 
 @asynccontextmanager
@@ -34,4 +36,15 @@ app.add_middleware(
 
 app.include_router(health_check_router)
 app.include_router(clear_db_router)
+app.include_router(insert_db_router)
 
+static_dir = os.path.join(os.path.dirname(__file__), "..", "static")
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+@app.get("/")
+async def serve_chat_interface():
+    html_path = os.path.join(os.path.dirname(__file__), "..", "static", "index.html")
+    if os.path.exists(html_path):
+        return FileResponse(html_path)
+    return {"message": "API is running. Place index.html in static folder."}

@@ -28,12 +28,19 @@ class Neo4jDBManager:
         with self.driver.session() as session:
             try:
                 query = """
-                MERGE (from:Location {name: $from_node})
-                MERGE (to:Location {name: $to_node})
-                MERGE (from)-[r:CONNECTED_TO]->(to)
-                SET r.distance = $distance, r.angle = $angle
-                RETURN from, to, r
-                """
+                        MERGE (from:Location {name: $from_node})
+                        MERGE (to:Location {name: $to_node})
+
+                        MERGE (from)-[r1:CONNECTED_TO]->(to)
+                        SET r1.distance = $distance,
+                            r1.angle = $angle
+
+                        MERGE (to)-[r2:CONNECTED_TO]->(from)
+                        SET r2.distance = $distance,
+                            r2.angle = ($angle + 180) % 360
+
+                        RETURN from, to, r1, r2
+                        """
                 result = session.run(
                     query,
                     from_node=relationship.from_node,
@@ -49,39 +56,46 @@ class Neo4jDBManager:
             except Exception as e:
                 print(f"Error creating relationship: {e}")
 
-    def create_database(self, db_name):
+    def relationship_exists(self, relationship: NodeRelationship) -> bool:
         """
-        Create a new database with the given name.
+        Check if a relationship exists between two nodes, in either direction.
+        Returns True if a connection exists, False otherwise.
         """
-        with self.driver.session(database="system") as session:
+        with self.driver.session() as session:
             try:
-                session.run(f"CREATE DATABASE {db_name} IF NOT EXISTS")
-                print(f"Database '{db_name}' created successfully.")
+                query = """
+                MATCH (a:Location)-[r:CONNECTED_TO]-(b:Location)
+                WHERE (a.name = $from_node AND b.name = $to_node) 
+                OR (a.name = $to_node AND b.name = $from_node)
+                RETURN r
+                """
+                result = session.run(
+                    query,
+                    from_node=relationship.from_node,
+                    to_node=relationship.to_node
+                )
+                record = result.single()
+                if record:
+                    print(f"Relationship exists between {relationship.from_node} and {relationship.to_node}")
+                    return True
+                else:
+                    print(f"No relationship exists between {relationship.from_node} and {relationship.to_node}")
+                    return False
             except Exception as e:
-                print(f"Error creating database '{db_name}': {e}")
+                print(f"Error checking relationship: {e}")
+                return False
 
-    def delete_database(self, db_name):
-        """
-        Delete a database with the given name.
-        """
-        with self.driver.session(database="system") as session:
-            try:
-                session.run(f"DROP DATABASE {db_name} IF EXISTS")
-                print(f"Database '{db_name}' deleted successfully.")
-            except Exception as e:
-                print(f"Error deleting database '{db_name}': {e}")
 
-    def clear_database(self, db_name: str):
+    def clear_database(self):
         """
         Clear all nodes and relationships from the given database.
         DOES NOT delete the database itself.
         """
-        with self.driver.session(database=db_name) as session:
+        with self.driver.session() as session:
             try:
                 session.run("MATCH (n) DETACH DELETE n")
-                print(f"Database '{db_name}' cleared successfully.")
             except Exception as e:
-                print(f"Error clearing database '{db_name}': {e}")
+                print(f"Error clearing database : {e}")
 
     def close(self):
         """
@@ -98,9 +112,14 @@ async def main():
     database = os.getenv("NEO4J_DATABASE", "chat_memory_graph")
 
     manager = Neo4jDBManager(uri, admin_user, admin_password, database)
-    relationship = NodeRelationship(from_node="B", to_node="A", distance=10.5, angle=45.0)
-    manager.create_relationship(relationship)
+    relationship = NodeRelationship(from_node="B", to_node="C", distance=10.5, angle=45.0)
+    exists = manager.relationship_exists(relationship)
 
+    if exists:
+        print("Relationship already exists. Skipping creation.")
+    else:
+        print("Creating relationship...")
+        manager.create_relationship(relationship)
 
     manager.close()
 
